@@ -7,7 +7,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 import sys
-import rospy
+import rclpy
+from rclpy.node import Node
 from mlagents_envs.base_env import ActionTuple
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
@@ -17,17 +18,15 @@ from gym_unity.envs import UnityToGymWrapper
 from utils.state_index import I
 from geometry_msgs.msg import Vector3
 
-control_method = rospy.get_param("controller/control_law")
-if control_method == 'ours':
-    from controller_ours import Controller
+from controller_ours import Controller
 
 
 
-class Environment(object):
+class Environment(Node):
     def __init__(self):
-        self.project_dir = rospy.get_param("project_dir")
-        env_dim = rospy.get_param("env/dimension")
-        self.num_fps = rospy.get_param("DLO/num_FPs")
+        self.project_dir = self.get_param("project_dir")
+        env_dim = self.get_param("env/dimension")
+        self.num_fps = self.get_param("DLO/num_FPs")
 
         engine_config_channel = EngineConfigurationChannel()
         env_params_channel = EnvironmentParametersChannel()
@@ -51,7 +50,7 @@ class Environment(object):
             state, reward, done, _ = self.env.step(self.control_input)
             state[I.left_end_avel_idx + I.right_end_avel_idx] /= 2*np.pi  # change the unit of the input angular velocity from rad/s  to 2pi*rad/s
 
-        while not rospy.is_shutdown():
+        while not rclpy.is_shutdown():
             self.control_input = self.controller.generateControlInput(state).copy()
             self.control_input[[3, 4, 5, 9, 10, 11]] *= 2*np.pi  # change the unit of the output angular velocity from 2pi*rad/s  torad/s
 
@@ -68,9 +67,11 @@ class Environment(object):
 # --------------------------------------------------------------------------
 if __name__ == '__main__':
     try:
-        rospy.init_node("sim_env_node")
+        rclpy.init()
+        # create node instance
+        node_env = Node(node_name="sim_env_node")
         env = Environment()
         env.mainLoop()
 
-    except rospy.ROSInterruptException:
+    except rclpy.ROSInterruptException:
         print("program interrupted before completion.")

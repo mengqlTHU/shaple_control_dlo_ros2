@@ -9,20 +9,23 @@ sys.path.insert(0, parrentdir)
 
 import numpy as np
 from matplotlib import pyplot as plt
-import rospy
+import rclpy
+from rclpy.node import Node
 from utils.state_index import I
 
+rclpy.init()
+# create node instance
+node_params = Node(node_name="node_params")
 
-project_dir = rospy.get_param("project_dir")
-num_fps = rospy.get_param("DLO/num_FPs")
-env = rospy.get_param("env/sim_or_real")
-target_points_idx = rospy.get_param("controller/object_fps_idx")
+project_dir = node_params.get_param("project_dir")
+num_fps = node_params.get_param("DLO/num_FPs")
+env = node_params.get_param("env/sim_or_real")
+target_points_idx = node_params.get_param("controller/object_fps_idx")
+env_dim = node_params.get_param("env/dimension")
 
 
 # ------------------------------------------------------------------------------
 def evaluateControlResults(names, num_case=100, delta_t=0.1):
-
-    env_dim = rospy.get_param("env/dimension")
     
     threshold = 0.05
     if env == 'sim':
