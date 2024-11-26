@@ -2,7 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import torch
 from torch._C import dtype
-import rospy
+import rclpy
+from rclpy.node import Node
 from scipy.spatial.transform import Rotation as sciR
 
 try:
@@ -11,8 +12,8 @@ except:
     from state_index import I
 
 
-env_dim = rospy.get_param("env/dimension")
-num_fps = rospy.get_param("DLO/num_FPs")
+env_dim = None
+num_fps = None
 
 
 # --------------------------------------------------------------------------------
@@ -252,9 +253,13 @@ if __name__ == '__main__':
 
     from my_plot import plot3dState
 
-    project_dir = rospy.get_param("project_dir")
-    env_dim = rospy.get_param("env/dimension")
-    num_fps = rospy.get_param("DLO/num_FPs")
+    rclpy.init()
+    # create node instance
+    node_params = Node(node_name="node_params")
+
+    project_dir = node_params.get_param("project_dir")
+    env_dim = node_params.get_param("env/dimension")
+    num_fps = node_params.get_param("DLO/num_FPs")
 
     states_world = np.load(project_dir + "data/train_data/"+ env_dim + "/state.npy").astype("float32")
 

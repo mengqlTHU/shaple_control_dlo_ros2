@@ -1,10 +1,12 @@
-import rospy
+import rclpy
+from rclpy.node import Node
 
-num_fps = rospy.get_param("DLO/num_FPs")
 
-
-class Index(object):
+class Index(Node):
     def __init__(self):
+
+        num_fps = self.get_param("DLO/num_FPs")
+
         length_start = 0
         length_end = 1
 
