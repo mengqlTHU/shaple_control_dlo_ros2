@@ -1,7 +1,7 @@
 sim_env:
   ros__parameters:
     # for the whole system
-    project_dir: '/home/byd/shape_control_DLO_2/'
+    project_dir: '/home/mengql/shape_control_DLO_2/'
 
     # for environment
     env/sim_or_real: 'sim'

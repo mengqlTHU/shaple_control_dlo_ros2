@@ -1,5 +1,0 @@
-<launch>
-
-     <param from="$(find dlo_system_pkg)/resource/params_sim.yaml" />
-
-</launch>
