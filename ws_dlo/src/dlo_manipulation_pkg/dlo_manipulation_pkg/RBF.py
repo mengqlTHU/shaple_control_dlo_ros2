@@ -12,10 +12,10 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from scipy.spatial.transform import Rotation as sciR
 
-import torch_rbf as rbf # reference: https://github.com/JeremyLinux/PyTorch-Radial-Basis-Function-Layer
+from . import torch_rbf as rbf # reference: https://github.com/JeremyLinux/PyTorch-Radial-Basis-Function-Layer
 
-from utils.data_augmentation import dataRandomTransform 
-from utils.state_index import I
+from .utils.data_augmentation import dataRandomTransform 
+from .utils.state_index import Index
 
 params_online_window_time = 2  # unit: second
 params_online_max_valid_fps_vel = 0.3
@@ -23,11 +23,10 @@ params_online_fps_vel_thres = 0.01
 params_online_min_valid_fps_vel = 0.00
 params_update_if_window_full = False
 
-
 # ----------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------
 class NNDataset(Dataset):
-    def __init__(self, state):
+    def __init__(self, state, I):
         self.data_num = state.shape[0]
         self.length = state[:, I.length_idx]
         self.state_input = state[:, I.state_input_idx]
@@ -91,20 +90,33 @@ class Net_J(nn.Module):
 
 # ----------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------
-class JacobianPredictor(Node):
+class JacobianPredictor():
     
     # ------------------------------------------------------
-    def __init__(self, num_hidden_unit=256):
+    def __init__(self, num_hidden_unit=256, params_dict={}):
 
-        numFPs = self.get_param("DLO/num_FPs")
-        projectDir = self.get_param("project_dir")
-        online_learning_rate = self.get_param("controller/online_learning/learning_rate")
-        lr_task_e = online_learning_rate
-        lr_approx_e = online_learning_rate * self.get_param("controller/online_learning/weight_ratio")
-        env = self.get_param("env/sim_or_real")
-        env_dim = self.get_param("env/dimension")
-        control_rate = self.get_param("ros_rate/env_rate")
-        online_update_rate = self.get_param("ros_rate/online_update_rate")
+        self.numFPs = params_dict['num_fps']
+        self.projectDir = params_dict['project_dir']
+
+
+        self.env_dim = params_dict['env_dim']
+        self.env = params_dict['env']
+        self.bEnableEndRotation = params_dict['bEnableEndRotation']
+        self.b_left_arm = params_dict['b_left_arm'] 
+        self.b_right_arm = params_dict['b_right_arm']
+        self.targetFPsIdx = params_dict['targetFPsIdx'] 
+        self.project_dir = params_dict['project_dir']
+        self.offline_model_name = params_dict['offline_model_name']
+        self.control_law = params_dict['control_law']
+        self.control_rate = params_dict['controlRate']
+        self.is_test = params_dict['learning_istest']
+
+        online_learning_rate = params_dict['online_learning_rate']
+        self.lr_task_e = online_learning_rate
+        self.lr_approx_e = online_learning_rate * params_dict['weight_ratio']
+        self.online_update_rate = params_dict['online_update_rate']
+
+        self.I = Index(num_fps = self.numFPs)
 
         device = torch.device("cuda:0")
         
@@ -119,7 +131,7 @@ class JacobianPredictor(Node):
         self.online_optimizer = torch.optim.SGD([{'params': self.model_J.fc2.parameters()}], lr=1.0/self.online_update_rate)
         self.mse_criterion = torch.nn.MSELoss(reduction='sum')
 
-        if self.get_param("learning/is_test"):
+        if self.is_test:
             self.nnWeightDir = self.projectDir + 'ws_dlo/src/dlo_manipulation_pkg/models_test/rbfWeights/' + self.env_dim + '/'
         else:
             self.nnWeightDir = self.projectDir + 'ws_dlo/src/dlo_manipulation_pkg/models/rbfWeights/' + self.env_dim + '/'
@@ -134,7 +146,7 @@ class JacobianPredictor(Node):
         # trainset
         if train_dataset is None:
             train_dataset = np.load(self.dataDir + 'train_data/' + self.env_dim + '/state_0.npy').astype(np.float32)[600*2 : 600*10, :]
-        self.trainDataset = NNDataset(train_dataset.astype(np.float32))
+        self.trainDataset = NNDataset(train_dataset.astype(np.float32), self.I)
         self.trainDataLoader = DataLoader(self.trainDataset, batch_size=512, shuffle=True, num_workers=4)
 
     # ------------------------------------------------------
@@ -142,7 +154,7 @@ class JacobianPredictor(Node):
         # testset
         if test_dataset is None:
             test_dataset = np.load(self.dataDir + 'train_data/' + self.env_dim + '/state_0.npy').astype(np.float32)[600*0 : 600*2, :]
-        self.testDataset = NNDataset(test_dataset.astype(np.float32))
+        self.testDataset = NNDataset(test_dataset.astype(np.float32), self.I)
         self.testDataLoader = DataLoader(self.testDataset, batch_size=test_dataset.shape[0], shuffle=False, num_workers=4)
 
 
@@ -155,8 +167,8 @@ class JacobianPredictor(Node):
             else:
                 print('Warning: no model exists !')
         else:
-            offline_model = self.get_param("controller/offline_model")
-            if self.get_param("learning/is_test"):
+            offline_model = self.offline_model_name
+            if self.is_test:
                 if os.path.exists(self.nnWeightDir  + "/model_J.pth"):
                     self.model_J.load_state_dict(torch.load(self.nnWeightDir + "/model_J.pth"))
                     # print('Load previous model.')
@@ -281,14 +293,14 @@ class JacobianPredictor(Node):
         # parameters
         window_size = params_online_window_time * self.control_rate
 
-        length = state[I.length_idx]
-        state_input = state[I.state_input_idx].reshape(1, -1) # one row matrix
+        length = state[self.I.length_idx]
+        state_input = state[self.I.state_input_idx].reshape(1, -1) # one row matrix
         if task_error is None:
             task_error = np.zeros((self.numFPs * 3, ), dtype='float32')
 
         # Because of the imperfection of the simulator, sometimes the DLO will wiggle to the other side very fast.
         # We don't want to include these outlier data in training, so we just discard the online data with too fast speed.
-        fps_vel_norm = np.linalg.norm(state[I.fps_vel_idx])
+        fps_vel_norm = np.linalg.norm(state[self.I.fps_vel_idx])
         if fps_vel_norm > params_online_max_valid_fps_vel or  fps_vel_norm < params_online_min_valid_fps_vel:
             # return the Jacobian without online updating
             length_torch = torch.tensor(length).cuda()
@@ -299,16 +311,16 @@ class JacobianPredictor(Node):
 
         # normalize the velocities
         elif fps_vel_norm > params_online_fps_vel_thres:
-            state[I.fps_vel_idx]  /= (fps_vel_norm)
-            state[I.ends_vel_idx]  /= (fps_vel_norm)
+            state[self.I.fps_vel_idx]  /= (fps_vel_norm)
+            state[self.I.ends_vel_idx]  /= (fps_vel_norm)
             task_error *= (fps_vel_norm)
         else:
-            state[I.fps_vel_idx] /= params_online_fps_vel_thres
-            state[I.ends_vel_idx]  /= params_online_fps_vel_thres
+            state[self.I.fps_vel_idx] /= params_online_fps_vel_thres
+            state[self.I.ends_vel_idx]  /= params_online_fps_vel_thres
             task_error *= (params_online_fps_vel_thres) 
 
-        fps_vel = state[I.fps_vel_idx]
-        ends_vel = state[I.ends_vel_idx]
+        fps_vel = state[self.I.fps_vel_idx]
+        ends_vel = state[self.I.ends_vel_idx]
             
         # --------------------------------------------------
         # update the NN weights
@@ -333,12 +345,12 @@ class JacobianPredictor(Node):
         # previous data in sliding window
         if len(self.online_dataset) > 1:
             online_dataset = np.array(self.online_dataset)
-            length_batch = online_dataset[:, I.length_idx]
-            state_input_batch = online_dataset[:, I.state_input_idx]
+            length_batch = online_dataset[:, self.I.length_idx]
+            state_input_batch = online_dataset[:, self.I.state_input_idx]
             if len(state_input_batch.shape) == 1:
                 state_input_batch = state_input_batch.reshape(1, -1)
-            fps_vel_batch = online_dataset[:, I.fps_vel_idx]
-            ends_vel_batch = online_dataset[:, I.ends_vel_idx]
+            fps_vel_batch = online_dataset[:, self.I.fps_vel_idx]
+            ends_vel_batch = online_dataset[:, self.I.ends_vel_idx]
             length_batch_torch = torch.tensor(length_batch).cuda()
             state_input_batch_torch = self.relativeStateRepresentationTorch(torch.tensor(state_input_batch)).cuda()
             ends_vel_batch_torch = torch.reshape(torch.tensor(ends_vel_batch), (-1, 1, 12)).cuda()

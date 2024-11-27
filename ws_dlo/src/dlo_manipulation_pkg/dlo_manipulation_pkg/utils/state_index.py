@@ -2,10 +2,8 @@ import rclpy
 from rclpy.node import Node
 
 
-class Index(Node):
-    def __init__(self):
-
-        num_fps = self.get_param("DLO/num_FPs")
+class Index():
+    def __init__(self, num_fps=10):
 
         length_start = 0
         length_end = 1
@@ -47,9 +45,6 @@ class Index(Node):
         self.right_end_avel_idx = self.ends_vel_idx[9:12]
 
         self.state_input_idx = self.fps_pos_idx + self.end_pose_idx
-
-
-I = Index()
 
 # print(I.length_idx)
 # print(I.fps_pos_idx)

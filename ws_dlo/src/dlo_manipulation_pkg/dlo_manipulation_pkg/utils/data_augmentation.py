@@ -6,10 +6,7 @@ import rclpy
 from rclpy.node import Node
 from scipy.spatial.transform import Rotation as sciR
 
-try:
-    from utils.state_index import I
-except:
-    from state_index import I
+from .state_index import Index
 
 
 env_dim = None

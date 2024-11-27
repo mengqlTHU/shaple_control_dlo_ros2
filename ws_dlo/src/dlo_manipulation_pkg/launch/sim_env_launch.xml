@@ -1,0 +1,5 @@
+<launch>
+	<node pkg="dlo_manipulation_pkg" exec="sim_env">
+	     <param from="$(find-pkg-prefix dlo_manipulation_pkg)/share/ament_index/resource_index/packages/params_sim.yaml" />
+	</node>
+</launch>
