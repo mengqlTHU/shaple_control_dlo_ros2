@@ -1,8 +1,8 @@
-# shape_control_DLO_2
+# shape_control_DLO_for_ROS2
 
-[Project website](https://mingrui-yu.github.io/shape_control_DLO_2/)
+[Original Project website](https://mingrui-yu.github.io/shape_control_DLO_2/)
 
-Repository for the IEEE T-RO Paper "Global Model Learning for Large Deformation Control of Elastic Deformable Linear Objects: An Efficient and Adaptive Approach".
+ROS2 Edition for repository for the IEEE T-RO Paper "Global Model Learning for Large Deformation Control of Elastic Deformable Linear Objects: An Efficient and Adaptive Approach".
 
 Here we provide:
 * the code for the model learning and controller
@@ -12,40 +12,35 @@ Here we provide:
 
 
 ## Dependencies
-* Ubuntu 18.04
-* ROS Melodic
+* Ubuntu 22.04
+* ROS Humble
 * Nvidia driver & CUDA
 * PyTorch in python3 env
-* [Unity](https://unity.com/) for Linux 2020.03
-* [Obi](http://obi.virtualmethodstudio.com/): for simulating the DLOs
+* [Unity](https://unity.com/) 6
+* [Obi](http://obi.virtualmethodstudio.com/): for simulating the DLOs (Actually not needed)
 * [Unity ML-Agents Toolkit](https://github.com/Unity-Technologies/ml-agents): for the communication between the Unity and Python scripts
 * [PyTorch-Radial-Basis-Function-Layer](https://github.com/JeremyLinux/PyTorch-Radial-Basis-Function-Layer): we use the code for the implementation of RBFN in pytorch
 
 ## Installation
 
-Install ROS Melodic on Ubuntu 18.04.
+Install ROS Humble on Ubuntu 22.04.
 
-Install Unity for Linux 2020.03 [doc](https://docs.unity3d.com/2020.2/Documentation/Manual/GettingStartedInstallingHub.html).
+Install Unity for Linux  [doc](https://docs.unity3d.com/2020.2/Documentation/Manual/GettingStartedInstallingHub.html).
 
 Install Unity ML-Agents Toolkit [doc](https://github.com/Unity-Technologies/ml-agents/blob/release_18_docs/docs/Installation.md).
 
 Install the following dependeces in your python3 env:
 ```
 # about pytorch
-conda install pytorch==1.7.0 torchvision==0.8.0 torchaudio==0.7.0 cudatoolkit=11.0 -c pytorch
-
-# about ROS
-pip install rospkg
+conda install pytorch
 
 # about Unity ML-Agents
-pip install mlagents==0.27.0
-pip install gym
-pip install gym_unity
+pip install mlagents
 
 # others
 pip install numpy
 pip install matplotlib
-pip install sklearn
+pip install scikit-learn
 pip install empy
 pip install PyYAML
 pip install scipy
@@ -53,17 +48,17 @@ pip install scipy
 
 Clone the repo:
 ```
-git clone https://github.com/Mingrui-Yu/shape_control_DLO_2.git
+git clone https://github.com/mengqlTHU/shaple_control_dlo_ros2.git
 ```
+Change the variable "project_dir" in *ws_dlo/src/dlo_system_pkg/config/params_sim.yaml* to '<YOUR_PATH>/shape_control_DLO_2/'.
 
 Build the catkin workspaces:
 
 ```
 cd <YOUR_PATH>/shape_control_DLO_2/ws_dlo
-catkin_make
+colcon build
 ```
 
-Change the variable "project_dir" in *ws_dlo/src/dlo_system_pkg/config/params_sim.yaml* to '<YOUR_PATH>/shape_control_DLO_2/'.
 
 ## Usage
 
@@ -91,18 +86,13 @@ Source the workspace:
 
 ```
 cd <YOUR_PATH>/shape_control_DLO_2/ws_dlo
-source devel/setup.bash
-```
-
-Upload the ROS params:
-```
-roslaunch dlo_system_pkg upload_sim_params.launch
+source install/local_setup.bash
 ```
 
 Then, **activate your python3 env**, and run:
 
 ```
-rosrun dlo_manipulation_pkg sim_env.py
+ros2 launch dlo_manipulation_pkg sim_env_launch.xml
 ```
 
 After the running, **activate your python3 env** and run the following script to evaluate the performance:
@@ -114,12 +104,6 @@ rosrun dlo_manipulation_pkg control_results_compare.py
 Upload the ROS params:
 ```
 roslaunch dlo_system_pkg upload_sim_params.launch
-```
-
-Then, **activate your python3 env**, and run:
-
-```
-rosrun dlo_manipulation_pkg RBF.py
 ```
 
 To change the training dataset, you can change the code in '\_\_main\_\_' of *dlo_manipulation_pkg/scripts/RBF.py*.
